@@ -1,207 +1,19 @@
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QLabel, QDoubleSpinBox,
-                             QComboBox, QCheckBox, QPushButton, QFileDialog, QMessageBox,
-                             QHBoxLayout, QVBoxLayout, QGridLayout, QSizePolicy)
-from PyQt6.QtGui import QPixmap, QIntValidator, QImage, QPainter, QIcon
-from PyQt6.QtCore import Qt, QDir, QFileInfo, QSize, pyqtSignal
+from PyQt6.QtWidgets import (QMainWindow, QWidget, QLabel, QComboBox, QCheckBox, QPushButton,
+                             QFileDialog, QMessageBox, QHBoxLayout, QVBoxLayout, QSizePolicy)
+from PyQt6.QtGui import QPixmap, QImage, QPainter, QIcon
+from PyQt6.QtCore import Qt, QDir, QFileInfo
 
-from enum import Enum
 from PIL import Image
 
-
-class SortKeys(Enum):
-    CREATE_DATE = 'create date'
-    LAST_MODIFIED = 'last modified'
-    NAME = 'name'
-
-
-class PageLayout(Enum):
-    SINGLE_PAGE = 'single page'
-    DOUBLE_PAGE_LEFT_RIGHT = 'double page — left to right'
-    DOUBLE_PAGE_RIGHT_LEFT = 'double page — right to left'
-
-
-class ImageFile:
-    def __init__(self, file_info: QFileInfo):
-        self.name = file_info.fileName()
-        self.suffix = file_info.suffix().lower()
-        self.create_timestamp = file_info.birthTime()
-        self.absolute_path = file_info.absoluteFilePath()
-        self.last_modified = file_info.lastModified()
-        self.width = 0
-        self.height = 0
-        self.left_margin, self.right_margin, self.top_margin, self.bottom_margin = 0, 0, 0, 0
-        self.__set_size()
-
-    def __set_size(self):
-        img = Image.open(self.absolute_path, 'r')
-        self.width, self.height = img.size
-        img.close()
-
-    def q_image(self):
-        return QImage(self.absolute_path)
-
-    def pil_image(self):
-        return Image.open(self.absolute_path, 'r')
-
-    def set_crop_margins(self, left, top, right, bottom):
-        self.left_margin = left
-        self.right_margin = right
-        self.top_margin = top
-        self.bottom_margin = bottom
-
-    def crop(self):
-        img = Image.open(self.absolute_path, 'r')
-        img = img.crop((self.left_margin, self.top_margin, self.right_margin, self.bottom_margin))
-        return img
-
-
-class IconAttribute:
-    def __init__(self, icon_path, attribute):
-        self.icon_path = icon_path
-        self.attribute = attribute
-
-
-class IconSelector(QWidget):
-    attributeChanged = pyqtSignal(PageLayout)
-
-    def __init__(self, icon_attributes, parent=None):
-        super().__init__(parent)
-        self.selected_index = None
-        layout = QHBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.buttons = list()
-
-        for i, attribute in enumerate(icon_attributes):
-            button = QPushButton()
-            button.setIcon(QIcon(attribute.icon_path))
-            button.setIconSize(QSize(32, 32))
-            button.setCheckable(True)
-            button.clicked.connect(lambda x, index=i: self.select_index(index))
-            button.clicked.connect(lambda x, atr=attribute.attribute: self.emit_attribute_signal(atr))
-            layout.addWidget(button)
-            self.buttons.append(button)
-
-        if self.buttons:
-            self.select_index(0)
-
-    def emit_attribute_signal(self, attribute):
-        self.attributeChanged.emit(attribute)
-
-    def select_index(self, index):
-        if self.selected_index is not None:
-            self.buttons[self.selected_index].setChecked(False)
-
-        self.selected_index = index
-        self.buttons[self.selected_index].setChecked(True)
-
-
-class CropOptions(QWidget):
-    marginsChanged = pyqtSignal(int, int, int, int, bool)
-
-    def __init__(self):
-        super(CropOptions, self).__init__()
-        self.width_validator = QIntValidator(0, 0)
-        self.height_validator = QIntValidator(0, 0)
-
-        # create the Edit Fields for input and initialize their values and functionalities
-        self.left_margin = 0
-        self.left_edt = QDoubleSpinBox()
-        self.left_edt.setRange(0, 0)
-        self.left_edt.setDecimals(0)
-        self.left_edt.setWrapping(True)
-        self.left_edt.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.left_edt.valueChanged.connect(self.set_crop_margins)
-
-        self.right_margin = 0
-        self.right_edt = QDoubleSpinBox()
-        self.right_edt.setRange(0, 0)
-        self.right_edt.setDecimals(0)
-        self.right_edt.setWrapping(True)
-        self.right_edt.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.right_edt.valueChanged.connect(self.set_crop_margins)
-
-        self.top_margin = 0
-        self.top_edt = QDoubleSpinBox()
-        self.top_edt.setRange(0, 0)
-        self.top_edt.setDecimals(0)
-        self.top_edt.setWrapping(True)
-        self.top_edt.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.top_edt.valueChanged.connect(self.set_crop_margins)
-
-        self.bottom_margin = 0
-        self.bottom_edt = QDoubleSpinBox()
-        self.bottom_edt.setRange(0, 0)
-        self.bottom_edt.setDecimals(0)
-        self.bottom_edt.setWrapping(True)
-        self.bottom_edt.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.bottom_edt.textChanged.connect(self.set_crop_margins)
-
-        self.same_crop_for_all = True   # whether the margin values should be applied to all or only the current image
-        self.__setup_layout()
-
-    def __setup_layout(self):
-        layout = QGridLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        layout.addWidget(QLabel('Set crop Margins:'), 0, 0, 1, 2)
-
-        same_crop_btn = QCheckBox('use same crop margins for all')
-        same_crop_btn.setChecked(self.same_crop_for_all)
-        same_crop_btn.stateChanged.connect(self.toggle_same_for_all)
-        layout.addWidget(same_crop_btn, 1, 0, 1, 2)
-
-        layout.addWidget(QLabel('Left:'), 2, 0)
-        layout.addWidget(self.left_edt, 2, 1)
-        layout.addWidget(QLabel('Right:'), 3, 0)
-        layout.addWidget(self.right_edt, 3, 1)
-        layout.addWidget(QLabel('Top:'), 4, 0)
-        layout.addWidget(self.top_edt, 4, 1)
-        layout.addWidget(QLabel('Bottom'), 5, 0)
-        layout.addWidget(self.bottom_edt, 5, 1)
-
-    def toggle_same_for_all(self, new_value):
-        self.same_crop_for_all = new_value
-        self.marginsChanged.emit(self.left_margin, self.top_margin,
-                                 self.right_margin, self.bottom_margin,
-                                 self.same_crop_for_all)
-
-    def set_limits(self, width, height):
-        self.left_edt.setMaximum(width)
-        self.left_edt.setValue(0)
-        self.right_edt.setMaximum(width)
-        self.right_edt.setValue(width)
-
-        self.top_edt.setMaximum(height)
-        self.top_edt.setValue(0)
-        self.bottom_edt.setMaximum(height)
-        self.bottom_edt.setValue(height)
-
-    def set_edt_text(self, left, top, right, bottom):
-        self.left_edt.setValue(left)
-        self.top_edt.setValue(top)
-        self.right_edt.setValue(right)
-        self.bottom_edt.setValue(bottom)
-
-    def set_crop_margins(self):
-        left = int(self.left_edt.value())
-        right = int(self.right_edt.value())
-        top = int(self.top_edt.value())
-        bottom = int(self.bottom_edt.value())
-
-        self.left_margin = min(left, right)
-        self.right_margin = max(left, right)
-        self.top_margin = min(top, bottom)
-        self.bottom_margin = max(top, bottom)
-
-        self.marginsChanged.emit(self.left_margin, self.top_margin,
-                                 self.right_margin, self.bottom_margin,
-                                 self.same_crop_for_all)
+from structures import PageLayout, SortKeys, ImageFile
+from Menus import CropOptions, IconSelector, IconAttribute
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
-        self.setWindowTitle('Image to PDF Stitcher')
-        self.setWindowIcon(QIcon('icon.png'))
+        self.setWindowTitle('Images to PDF Stitcher')
+        self.setWindowIcon(QIcon('images/icon.png'))
 
         self.preview_lbl = QLabel(self)
         self.preview_lbl.setStyleSheet('background-color: rgb(192, 192, 192)')
@@ -256,9 +68,9 @@ class MainWindow(QMainWindow):
         option_layout.addLayout(sort_layout)
         option_layout.addSpacing(20)
         option_layout.addWidget(QLabel('page layout: '))
-        page_layout_selection = IconSelector([IconAttribute('singlePageIcon.png', PageLayout.SINGLE_PAGE),
-                                              IconAttribute('doublePageIcon1.png', PageLayout.DOUBLE_PAGE_LEFT_RIGHT),
-                                              IconAttribute('doublePageIcon2.png', PageLayout.DOUBLE_PAGE_RIGHT_LEFT)])
+        page_layout_selection = IconSelector([IconAttribute('images/singlePageIcon.png', PageLayout.SINGLE_PAGE),
+                                              IconAttribute('images/doublePageIcon1.png', PageLayout.DOUBLE_PAGE_LEFT_RIGHT),
+                                              IconAttribute('images/doublePageIcon2.png', PageLayout.DOUBLE_PAGE_RIGHT_LEFT)])
         page_layout_selection.attributeChanged.connect(self.set_pdf_layout)
         option_layout.addWidget(page_layout_selection)
 
@@ -314,23 +126,17 @@ class MainWindow(QMainWindow):
                 page_list[0].save(file_name, 'PDF', save_all=True, append_images=page_list[1:])
                 msg = QMessageBox()
                 msg.setWindowTitle('Saving PDF')
-                msg.setWindowIcon(QIcon('icon.png'))
+                msg.setWindowIcon(QIcon('images/icon.png'))
                 msg.setText('Finished Saving!')
                 msg.exec()
 
     def set_crop_margins(self, left, top, right, bottom, for_all):
         if self.files:
-            # limit the margin values, because QValidator only affects magnitude
-            l = min(left, self.max_image_width-1)
-            r = min(right, self.max_image_width-1)
-            t = min(top, self.max_image_height-1)
-            b = min(bottom, self.max_image_height-1)
-
             if for_all:
                 for file in self.files:
-                    file.set_crop_margins(l, t, r, b)
+                    file.set_crop_margins(left, top, right, bottom)
             else:
-                self.files[self.img_index].set_crop_margins(l, t, r, b)
+                self.files[self.img_index].set_crop_margins(left, top, right, bottom)
         self.show_preview()
 
     def draw_crop(self):
