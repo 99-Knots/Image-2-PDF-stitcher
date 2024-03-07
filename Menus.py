@@ -1,9 +1,11 @@
-from PyQt6.QtWidgets import (QWidget, QDoubleSpinBox, QLabel, QPushButton, QCheckBox,
-                             QGridLayout, QHBoxLayout, QSizePolicy)
+from PyQt6.QtWidgets import (QWidget, QDoubleSpinBox, QLabel, QPushButton, QCheckBox, QComboBox,
+                             QGridLayout, QHBoxLayout, QVBoxLayout, QSizePolicy, QFileDialog)
 from PyQt6.QtGui import QIcon
-from PyQt6.QtCore import QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QDir, QFileInfo, QSize, Qt, pyqtSignal
 
-from structures import PageLayout
+from PIL import Image
+
+from structures import SortKeys, PageLayout, ImageFile
 
 
 class IconAttribute:
@@ -12,45 +14,196 @@ class IconAttribute:
         self.attribute = attribute
 
 
-class IconSelector(QWidget):
-    attributeChanged = pyqtSignal(PageLayout)
+class LayoutMenu(QWidget):
+    selectionChanged = pyqtSignal(PageLayout)
+    coverChecked = pyqtSignal(bool)
 
-    def __init__(self, icon_attributes: list[IconAttribute], parent=None):
-        super().__init__(parent)
-        self.selected_index = None
-        layout = QHBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+    def __init__(self):
+        super(LayoutMenu, self).__init__()
+        lbl = QLabel('PDF layout: ')
+        attributes = [IconAttribute('images/singlePageIcon.png', PageLayout.SINGLE_PAGE),
+                      IconAttribute('images/doublePageIcon1.png', PageLayout.DOUBLE_PAGE_LEFT_RIGHT),
+                      IconAttribute('images/doublePageIcon2.png', PageLayout.DOUBLE_PAGE_RIGHT_LEFT)]
         self.buttons = list()
+        self.selected_index = 0
 
-        for i, attribute in enumerate(icon_attributes):
-            button = QPushButton()
-            button.setIcon(attribute.icon)
-            button.setIconSize(QSize(32, 32))
-            button.setCheckable(True)
-            button.clicked.connect(lambda x, index=i: self.select_index(index))
-            button.clicked.connect(lambda x, atr=attribute.attribute: self.emit_attribute_signal(atr))
-            layout.addWidget(button)
-            self.buttons.append(button)
+        cover_checkbox = QCheckBox('first image as separate cover')
+        cover_checkbox.stateChanged.connect(lambda b: self.coverChecked.emit(b))
+        layout = QVBoxLayout(self)
+        btn_layout = QHBoxLayout()
+        btn_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(lbl)
+        layout.addLayout(btn_layout)
+        layout.addWidget(cover_checkbox)
+
+        for i, attr in enumerate(attributes):
+            btn = QPushButton()
+            btn.setIcon(attr.icon)
+            btn.setIconSize(QSize(32, 32))
+            btn.setCheckable(True)
+            btn.clicked.connect(lambda x, index=i: self.select_index(index))
+            btn.clicked.connect(lambda x, a=attr.attribute: self.selectionChanged.emit(a))
+            btn_layout.addWidget(btn)
+            self.buttons.append(btn)
 
         if self.buttons:
-            self.select_index(0)
+            self.buttons[0].click()
 
-    def emit_attribute_signal(self, attribute):
-        self.attributeChanged.emit(attribute)
-
-    def select_index(self, index):
-        if self.selected_index is not None:
+    def select_index(self, index=0):
+        if self.buttons:
             self.buttons[self.selected_index].setChecked(False)
+            self.selected_index = index
+            self.buttons[self.selected_index].setChecked(True)
 
-        self.selected_index = index
-        self.buttons[self.selected_index].setChecked(True)
+
+class LoadMenu(QWidget):
+    loadedFiles = pyqtSignal(list)
+
+    def __init__(self):
+        super(LoadMenu, self).__init__()
+        load_dir_btn = QPushButton('load from folder')
+        load_files_btn = QPushButton('load from files')
+
+        load_dir_btn.clicked.connect(self.load_by_dir)
+        load_files_btn.clicked.connect(self.load_by_files)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(load_dir_btn)
+        layout.addWidget(load_files_btn)
+
+    def load_by_dir(self):
+        selected_path = QFileDialog.getExistingDirectory(self, 'Select Folder')
+        if selected_path:
+            files = list()
+            directory = QDir(selected_path)
+            file_infos = directory.entryInfoList(['*.jpg', '*.png', '*.bmp'],
+                                                 QDir.Filter.Files | QDir.Filter.NoDotAndDotDot)
+            for file in file_infos:
+                files.append(ImageFile(file))
+            self.loadedFiles.emit(files)
+
+    def load_by_files(self):
+        filenames = QFileDialog.getOpenFileNames(self, 'Select individual Files', '', 'Image Files (*.png *.jpg *.bmp)')
+        if filenames[0]:
+            files = list()
+            for file in filenames[0]:
+                files.append(ImageFile(QFileInfo(file)))
+            self.loadedFiles.emit(files)
 
 
-class CropOptions(QWidget):
+class SaveMenu(QWidget):
+    def __init__(self, files: list[ImageFile],
+                 page_layout: PageLayout = PageLayout.SINGLE_PAGE,
+                 separate_cover: bool = True):
+        super(SaveMenu, self).__init__()
+        self.files = files
+        self.left_to_right = True
+        self.double_pages = True
+        self.separate_cover = separate_cover
+        self.set_pdf_layout(page_layout)
+        save_btn = QPushButton('create PDF')
+        layout = QVBoxLayout(self)
+        layout.addWidget(save_btn)
+        save_btn.clicked.connect(self.create_pdf)
+
+    def set_separate_cover(self, separate_cover: bool):
+        self.separate_cover = separate_cover
+
+    def set_pdf_layout(self, layout: PageLayout):
+        if layout == PageLayout.SINGLE_PAGE:
+            self.left_to_right = True
+            self.double_pages = False
+        elif layout == PageLayout.DOUBLE_PAGE_LEFT_RIGHT:
+            self.left_to_right = True
+            self.double_pages = True
+        elif layout == PageLayout.DOUBLE_PAGE_RIGHT_LEFT:
+            self.left_to_right = False
+            self.double_pages = True
+
+    def create_pdf(self):
+        if self.files:
+            filename = QFileDialog.getSaveFileName(self, 'Save File', '', 'PDF Files  (*.pdf)')[0]
+            if filename:
+                if self.double_pages:
+                    page_list = self.create_double_page_list()
+                else:
+                    page_list = self.create_single_page_list()
+                if page_list:
+                    page_list[0].save(filename, 'PDF', save_all=True, append_images=page_list[1:])
+
+    def create_single_page_list(self):
+        page_list = list()
+        if self.files:
+            for file in self.files:
+                page_list.append(file.crop())
+        return page_list
+
+    def create_double_page_list(self):
+        page_list = list()
+        if self.files:
+            start_index = 0
+            if self.separate_cover:
+                start_index = 1
+                page_list.append(self.files[0].crop())
+            for i in range(start_index, len(self.files), 2):
+                img1 = self.files[i].crop()
+                if i+1 < len(self.files):
+                    img2 = self.files[i+1].crop()
+                    if self.left_to_right:
+                        page_list.append(self.create_double_page(img1, img2))
+                    else:
+                        page_list.append(self.create_double_page(img2, img1))
+                else:
+                    if self.left_to_right:
+                        page_list.append(self.create_double_page(img_left=img1))
+                    else:
+                        page_list.append(self.create_double_page(img_right=img1))
+        return page_list
+
+    @staticmethod
+    def create_double_page(img_left: Image = None, img_right: Image = None):
+        width = 0
+        height = 0
+
+        if img_left is not None:
+            width += img_left.width if img_right is not None else img_left.width*2
+            height = max(height, img_left.height)
+        if img_right is not None:
+            width += img_right.width if img_left is not None else img_right.width*2
+            height = max(height, img_right.height)
+
+        page = Image.new('RGB', (width, height), (255, 255, 255))
+
+        if img_left is not None:
+            page.paste(img_left, (0, (height-img_left.height)//2))    # place img on left edge, centered horizontally
+        if img_right is not None:
+            page.paste(img_right, (width-img_right.width, (height-img_right.height)//2))
+
+        return page
+
+
+class SortMenu(QWidget):
+    selectionChanged = pyqtSignal(SortKeys)
+
+    def __init__(self):
+        super(SortMenu, self).__init__()
+        lbl = QLabel('sort by: ')
+        selection = QComboBox()
+        for key in SortKeys:
+            selection.addItem(key.value)
+        selection.setSizePolicy(QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed))
+        selection.currentTextChanged.connect(lambda t: self.selectionChanged.emit(SortKeys(t)))
+
+        layout = QHBoxLayout(self)
+        layout.addWidget(lbl)
+        layout.addWidget(selection)
+
+
+class CropMenu(QWidget):
     marginsChanged = pyqtSignal(int, int, int, int, bool)
 
     def __init__(self):
-        super(CropOptions, self).__init__()
+        super(CropMenu, self).__init__()
         # create the Edit Fields for input and initialize their values and functionalities
         self.left_margin = 0
         self.left_edt = QDoubleSpinBox()
@@ -90,7 +243,7 @@ class CropOptions(QWidget):
     def __setup_layout(self):
         layout = QGridLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        layout.addWidget(QLabel('Set crop Margins:'), 0, 0, 1, 2)
+        layout.addWidget(QLabel('set crop margins:'), 0, 0, 1, 2)
 
         same_crop_btn = QCheckBox('use same crop margins for all')
         same_crop_btn.setChecked(self.same_crop_for_all)
@@ -152,3 +305,9 @@ class CropOptions(QWidget):
         self.top_edt.setValue(top)
         self.right_edt.setValue(right)
         self.bottom_edt.setValue(bottom)
+
+    def load_margins(self, image: ImageFile):
+        self.left_edt.setValue(image.left_margin)
+        self.right_edt.setValue(image.right_margin)
+        self.top_edt.setValue(image.top_margin)
+        self.bottom_edt.setValue(image.bottom_margin)
