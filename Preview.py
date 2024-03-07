@@ -1,33 +1,92 @@
-from PyQt6.QtWidgets import QWidget, QLabel, QPushButton, QHBoxLayout
-from PyQt6.QtGui import QImage, QPixmap, QPainter
+from PyQt6.QtWidgets import QWidget, QLabel, QLineEdit, QPushButton, QHBoxLayout, QVBoxLayout, QSizePolicy
+from PyQt6.QtGui import QImage, QPixmap, QPainter, QIntValidator
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from structures import ImageFile
 
 
+class PageCounter(QWidget):
+    pageChanged = pyqtSignal(int)
+
+    def __init__(self):
+        super(PageCounter, self).__init__()
+        self.validator = QIntValidator(1, 1)
+
+        self.current_edt = QLineEdit('0')
+        self.current_edt.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.current_edt.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        self.current_edt.setValidator(self.validator)
+        self.current_edt.textEdited.connect(self.emit_page_change)
+
+        slash_lbl = QLabel('/')
+        slash_lbl.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.page_nr_lbl = QLabel('0')
+
+        layout = QHBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.current_edt)
+        layout.addWidget(slash_lbl)
+        layout.addWidget(self.page_nr_lbl)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.resize_labels()
+
+    def emit_page_change(self, text: str):
+        if text:
+            i = max(self.validator.bottom(), min(self.validator.top(), int(text)))
+            self.pageChanged.emit(i-1)
+        else:
+            self.pageChanged.emit(0)
+
+    def resize_labels(self):
+        max_txt = '0' * (len(str(self.validator.top())) + 2)
+        width = self.current_edt.fontMetrics().horizontalAdvance(max_txt)
+        self.current_edt.setFixedWidth(width)
+        self.page_nr_lbl.setFixedWidth(width)
+
+    def set_page_count(self, nr: int):
+        self.page_nr_lbl.setText(str(nr))
+        self.validator.setTop(nr)
+        self.resize_labels()
+
+    def go_to_page(self, i: int):
+        if i != 0 and self.current_edt.text() != '':
+            self.current_edt.setText(str(i))
+
+
 class ImagePreview(QWidget):
-    previewChanged = pyqtSignal(ImageFile)
+    previewChanged = pyqtSignal(ImageFile, int)
+    pageCountChanged = pyqtSignal(int)
 
     def __init__(self, files: list[ImageFile]):
         super(ImagePreview, self).__init__()
+        self.files = files
+        self._index = 0
+        self._page_count = 0
+
         self.preview_img = None
         self.preview_lbl = QLabel()
         self.preview_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_lbl.setStyleSheet('background-color: rgb(192, 192, 192)')
         self.preview_lbl.setFixedSize(375, 500)
-        self.files = files
-        self._index = 0
-        self._page_count = 0
+
+        self.page_counter = PageCounter()
+        self.previewChanged.connect(lambda x, i: self.page_counter.go_to_page(i+1))
+        self.pageCountChanged.connect(self.page_counter.set_page_count)
+        self.page_counter.pageChanged.connect(self.go_to_index)
 
         next_btn = QPushButton('>')
         next_btn.clicked.connect(lambda: self.go_to_index(self.index + 1))
         prev_btn = QPushButton('<')
         prev_btn.clicked.connect(lambda: self.go_to_index(self.index - 1))
 
-        self.layout = QHBoxLayout(self)
-        self.layout.addWidget(prev_btn)
-        self.layout.addWidget(self.preview_lbl)
-        self.layout.addWidget(next_btn)
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        preview_layout = QHBoxLayout()
+        preview_layout.addWidget(prev_btn)
+        preview_layout.addWidget(self.preview_lbl)
+        preview_layout.addWidget(next_btn)
+        layout.addLayout(preview_layout)
+        layout.addWidget(self.page_counter)
 
     @property
     def index(self):
@@ -38,7 +97,7 @@ class ImagePreview(QWidget):
         self._index = index
         if self.files:
             self.update_preview()
-            self.previewChanged.emit(self.files[self.index])
+            self.previewChanged.emit(self.files[self.index], self.index)
 
     @property
     def page_count(self):
@@ -46,7 +105,10 @@ class ImagePreview(QWidget):
 
     @page_count.setter
     def page_count(self, i: int):
-        self._page_count = i
+        if i != self.page_count:
+            self._page_count = i
+            self.pageCountChanged.emit(self.page_count)
+            #self.page_counter.set_page_count(self.page_count)
 
     def assign_files(self, file_list: list[ImageFile]):
         self.files = file_list  # reference to file list

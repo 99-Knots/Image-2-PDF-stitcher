@@ -76,8 +76,7 @@ class LoadMenu(QWidget):
         if selected_path:
             files = list()
             directory = QDir(selected_path)
-            file_infos = directory.entryInfoList(['*.jpg', '*.png', '*.bmp'],
-                                                 QDir.Filter.Files | QDir.Filter.NoDotAndDotDot)
+            file_infos = directory.entryInfoList(['*.jpg', '*.png', '*.bmp'], QDir.Filter.Files)
             for file in file_infos:
                 files.append(ImageFile(file))
             self.loadedFiles.emit(files)
