@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QWidget, QLabel, QPushButton, QProgressBar, QVBoxLayout, QFileDialog
-from PyQt6.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal
+from PyQt6.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal, pyqtSlot
 
 from PIL import Image
 
@@ -7,6 +7,9 @@ from structures import PageLayout, ImageFile
 
 
 class SavingRunnable(QRunnable):
+    """
+    QRunnable instance to prepare the PDF pages and save the file without blocking the GUI-thread
+    """
     class SavingSignal(QObject):
         finished = pyqtSignal()
         progress = pyqtSignal(int)
@@ -87,12 +90,15 @@ class SavingRunnable(QRunnable):
         self.signal.finished.emit()
 
 
-class SaveMenu(QWidget):
+class SaveWidget(QWidget):
+    """
+    Menu that handles the PDF formatting and saving Progress
+    """
     started = pyqtSignal()
     finished = pyqtSignal()
 
     def __init__(self, files: list[ImageFile]):
-        super(SaveMenu, self).__init__()
+        super(SaveWidget, self).__init__()
         self.files = files
         self.right_to_left = False
         self.double_pages = False
@@ -110,9 +116,11 @@ class SaveMenu(QWidget):
         layout.addWidget(self.progress_lbl)
         self.save_btn.clicked.connect(self.save_pdf)
 
+    @pyqtSlot(bool)
     def set_separate_cover(self, separate_cover: bool):
         self.separate_cover = separate_cover
 
+    @pyqtSlot(PageLayout)
     def set_pdf_layout(self, layout: PageLayout):
         if layout == PageLayout.SINGLE_PAGE:
             self.right_to_left = False
@@ -124,19 +132,18 @@ class SaveMenu(QWidget):
             self.right_to_left = True
             self.double_pages = True
 
+    @pyqtSlot()
     def hide_progress(self):
         if self.progress_bar.value() >= self.progress_bar.maximum():    # don't hide progress view while saving
             self.progress_bar.setHidden(True)
             self.progress_lbl.setHidden(True)
 
-    def activate_progress_view(self):
-        self.progress_bar.setHidden(False)
-        self.progress_lbl.setHidden(False)
-        self.set_progress_max(len(self.files))
-        self.progress_bar.setValue(0)
-        self.progress_lbl.setText('Saving...')
-
+    @pyqtSlot()
     def save_pdf(self):
+        """
+        get save location through QFileDialog and start Saving process
+        :return:
+        """
         if self.files:
             filename = QFileDialog.getSaveFileName(self, 'Save File', '', 'PDF Files  (*.pdf)')[0]
             if filename:
@@ -148,14 +155,28 @@ class SaveMenu(QWidget):
                 saving.signal.finished.connect(lambda: self.progress(len(self.files)))
                 QThreadPool.globalInstance().start(saving)
 
+    @pyqtSlot(int)
     def set_progress_max(self, new_max: int):
         self.progress_bar.setMaximum(new_max)
 
+    @pyqtSlot(int)
     def progress(self, value: int):
+        """
+        advance the progress bar and if finished emit signal for that
+        :param value: new value for progress bar
+        :return:
+        """
         self.progress_bar.setValue(value)
         if value == self.progress_bar.maximum():
             self.progress_lbl.setText('Saving Completed!')
             self.finished.emit()
+
+    def activate_progress_view(self):
+        self.progress_bar.setHidden(False)
+        self.progress_lbl.setHidden(False)
+        self.set_progress_max(len(self.files))
+        self.progress_bar.setValue(0)
+        self.progress_lbl.setText('Saving...')
 
     def setEnabled(self, a0: bool):
         self.save_btn.setEnabled(a0)
