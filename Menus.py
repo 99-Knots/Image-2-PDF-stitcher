@@ -89,46 +89,6 @@ class LoadMenu(QWidget):
             self.loadedFiles.emit(files)
 
 
-class SaveMenu(QWidget):
-    startSaving = pyqtSignal()
-
-    def __init__(self, files: list[ImageFile]):
-        super(SaveMenu, self).__init__()
-        self.save_btn = QPushButton('create PDF')
-        self.progress_bar = QProgressBar()
-        self.progress_lbl = QLabel('Saving...')
-        self.progress_bar.setHidden(True)
-        self.progress_lbl.setHidden(True)
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.save_btn)
-        layout.addWidget(self.progress_bar)
-        layout.addWidget(self.progress_lbl)
-        self.save_btn.clicked.connect(self.save_pdf)
-
-    def hide_progress(self):
-        self.progress_bar.setHidden(True)
-        self.progress_lbl.setHidden(True)
-
-    def save_pdf(self):
-        self.progress_bar.setHidden(False)
-        self.progress_lbl.setHidden(False)
-        self.progress_bar.setValue(0)
-        self.progress_lbl.setText('Saving...')
-        self.startSaving.emit()
-
-    def set_progress_max(self, new_max: int):
-        self.progress_bar.setMaximum(new_max)
-
-    def progress(self, value: int):
-        self.progress_bar.setValue(value)
-        if value == self.progress_bar.maximum():
-            self.progress_lbl.setText('Saving Completed!')
-
-    def setEnabled(self, a0: bool) -> None:
-        self.save_btn.setEnabled(a0)
-
-
 class SortMenu(QWidget):
     selectionChanged = pyqtSignal(SortKeys)
 
