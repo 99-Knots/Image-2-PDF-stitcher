@@ -54,8 +54,8 @@ class MainWindow(QMainWindow):
         self.crop_menu.marginsChanged.connect(self.set_crop_margins)
         self.crop_menu.marginsChanged.connect(self.preview.update_preview)
 
-        #self.layout_menu.selectionChanged.connect(self.save_menu.set_pdf_layout)
-        #self.layout_menu.coverChecked.connect(self.save_menu.set_separate_cover)
+        self.layout_menu.selectionChanged.connect(self.set_pdf_layout)
+        self.layout_menu.coverChecked.connect(self.set_separate_cover)
 
         self.__setup_layout()
 
@@ -93,7 +93,6 @@ class MainWindow(QMainWindow):
             return page
 
         self.page_list.clear()
-        #self.save_menu.hide_progress()
         self.save_menu.set_progress_max(len(self.files)*2)
         if self.files:
             file_name = QFileDialog.getSaveFileName(self, 'Save File', '', 'PDF Files  (*.pdf)')[0]
