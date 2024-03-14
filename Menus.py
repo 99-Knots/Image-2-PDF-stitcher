@@ -1,9 +1,8 @@
-from PyQt6.QtWidgets import (QWidget, QDoubleSpinBox, QLabel, QPushButton, QCheckBox, QComboBox,
+from PyQt6.QtWidgets import (QWidget, QDoubleSpinBox, QLabel, QPushButton, QCheckBox, QComboBox, QProgressBar,
                              QGridLayout, QHBoxLayout, QVBoxLayout, QSizePolicy, QFileDialog)
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import QDir, QFileInfo, QSize, Qt, pyqtSignal
 
-from PIL import Image
 
 from structures import SortKeys, PageLayout, ImageFile
 
@@ -91,111 +90,75 @@ class LoadMenu(QWidget):
 
 
 class SaveMenu(QWidget):
-    def __init__(self, files: list[ImageFile],
-                 page_layout: PageLayout = PageLayout.SINGLE_PAGE,
-                 separate_cover: bool = True):
+    startSaving = pyqtSignal()
+
+    def __init__(self, files: list[ImageFile]):
         super(SaveMenu, self).__init__()
-        self.files = files
-        self.left_to_right = True
-        self.double_pages = True
-        self.separate_cover = separate_cover
-        self.set_pdf_layout(page_layout)
-        save_btn = QPushButton('create PDF')
+        self.save_btn = QPushButton('create PDF')
+        self.progress_bar = QProgressBar()
+        self.progress_lbl = QLabel('Saving...')
+        self.progress_bar.setHidden(True)
+        self.progress_lbl.setHidden(True)
+
         layout = QVBoxLayout(self)
-        layout.addWidget(save_btn)
-        save_btn.clicked.connect(self.create_pdf)
+        layout.addWidget(self.save_btn)
+        layout.addWidget(self.progress_bar)
+        layout.addWidget(self.progress_lbl)
+        self.save_btn.clicked.connect(self.save_pdf)
 
-    def set_separate_cover(self, separate_cover: bool):
-        self.separate_cover = separate_cover
+    def hide_progress(self):
+        self.progress_bar.setHidden(True)
+        self.progress_lbl.setHidden(True)
 
-    def set_pdf_layout(self, layout: PageLayout):
-        if layout == PageLayout.SINGLE_PAGE:
-            self.left_to_right = True
-            self.double_pages = False
-        elif layout == PageLayout.DOUBLE_PAGE_LEFT_RIGHT:
-            self.left_to_right = True
-            self.double_pages = True
-        elif layout == PageLayout.DOUBLE_PAGE_RIGHT_LEFT:
-            self.left_to_right = False
-            self.double_pages = True
+    def save_pdf(self):
+        self.progress_bar.setHidden(False)
+        self.progress_lbl.setHidden(False)
+        self.progress_bar.setValue(0)
+        self.progress_lbl.setText('Saving...')
+        self.startSaving.emit()
 
-    def create_pdf(self):
-        if self.files:
-            filename = QFileDialog.getSaveFileName(self, 'Save File', '', 'PDF Files  (*.pdf)')[0]
-            if filename:
-                if self.double_pages:
-                    page_list = self.create_double_page_list()
-                else:
-                    page_list = self.create_single_page_list()
-                if page_list:
-                    page_list[0].save(filename, 'PDF', save_all=True, append_images=page_list[1:])
+    def set_progress_max(self, new_max: int):
+        self.progress_bar.setMaximum(new_max)
 
-    def create_single_page_list(self):
-        page_list = list()
-        if self.files:
-            for file in self.files:
-                page_list.append(file.crop())
-        return page_list
+    def progress(self, value: int):
+        self.progress_bar.setValue(value)
+        if value == self.progress_bar.maximum():
+            self.progress_lbl.setText('Saving Completed!')
 
-    def create_double_page_list(self):
-        page_list = list()
-        if self.files:
-            start_index = 0
-            if self.separate_cover:
-                start_index = 1
-                page_list.append(self.files[0].crop())
-            for i in range(start_index, len(self.files), 2):
-                img1 = self.files[i].crop()
-                if i+1 < len(self.files):
-                    img2 = self.files[i+1].crop()
-                    if self.left_to_right:
-                        page_list.append(self.create_double_page(img1, img2))
-                    else:
-                        page_list.append(self.create_double_page(img2, img1))
-                else:
-                    if self.left_to_right:
-                        page_list.append(self.create_double_page(img_left=img1))
-                    else:
-                        page_list.append(self.create_double_page(img_right=img1))
-        return page_list
-
-    @staticmethod
-    def create_double_page(img_left: Image = None, img_right: Image = None):
-        width = 0
-        height = 0
-
-        if img_left is not None:
-            width += img_left.width if img_right is not None else img_left.width*2
-            height = max(height, img_left.height)
-        if img_right is not None:
-            width += img_right.width if img_left is not None else img_right.width*2
-            height = max(height, img_right.height)
-
-        page = Image.new('RGB', (width, height), (255, 255, 255))
-
-        if img_left is not None:
-            page.paste(img_left, (0, (height-img_left.height)//2))    # place img on left edge, centered horizontally
-        if img_right is not None:
-            page.paste(img_right, (width-img_right.width, (height-img_right.height)//2))
-
-        return page
+    def setEnabled(self, a0: bool) -> None:
+        self.save_btn.setEnabled(a0)
 
 
 class SortMenu(QWidget):
     selectionChanged = pyqtSignal(SortKeys)
 
-    def __init__(self):
+    def __init__(self, files):
         super(SortMenu, self).__init__()
+        self.files = files
+        self.sort_key = SortKeys.CREATE_DATE
         lbl = QLabel('sort by: ')
         selection = QComboBox()
         for key in SortKeys:
             selection.addItem(key.value)
         selection.setSizePolicy(QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed))
-        selection.currentTextChanged.connect(lambda t: self.selectionChanged.emit(SortKeys(t)))
+        selection.currentTextChanged.connect(lambda t: self.sort_files(SortKeys(t)))
 
         layout = QHBoxLayout(self)
         layout.addWidget(lbl)
         layout.addWidget(selection)
+
+        self.sort_key = SortKeys(selection.itemText(0))     # set sort key to default of selection
+
+    def sort_files(self, key: SortKeys = None):
+        if key is not None:
+            self.sort_key = key
+        if self.sort_key == SortKeys.NAME:
+            self.files.sort(key=lambda f: f.name)
+        if self.sort_key == SortKeys.CREATE_DATE:
+            self.files.sort(key=lambda f: f.create_timestamp)
+        if self.sort_key == SortKeys.LAST_MODIFIED:
+            self.files.sort(key=lambda f: f.last_modified)
+        self.selectionChanged.emit(self.sort_key)
 
 
 class CropMenu(QWidget):

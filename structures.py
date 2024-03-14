@@ -48,5 +48,6 @@ class ImageFile:
 
     def crop(self):
         img = Image.open(self.absolute_path, 'r')
-        img = img.crop((self.left_margin, self.top_margin, self.right_margin, self.bottom_margin))
-        return img
+        cropped = img.crop((self.left_margin, self.top_margin, self.right_margin, self.bottom_margin))
+        img.close()
+        return cropped
