@@ -173,9 +173,8 @@ class ImagePreview(QWidget):
 
     @index.setter   # setters allow for signals to be emitted on changes to variable -> link with labels
     def index(self, index):
-        if index != self._index:
-            self._index = index
-            self.update_preview()
+        self._index = index
+        self.update_preview()
 
     @property
     def page_count(self):
