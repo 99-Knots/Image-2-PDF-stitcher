@@ -3,7 +3,7 @@ from PyQt6.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal, pyqtSlot
 
 from PIL import Image
 
-from structures import PageLayout, ImageFile
+from structures import ImageFile
 
 
 class SavingRunnable(QRunnable):
@@ -94,8 +94,8 @@ class SaveWidget(QWidget):
     """
     Menu that handles the PDF formatting and saving Progress
     """
-    started = pyqtSignal()
-    finished = pyqtSignal()
+    startedSaving = pyqtSignal()
+    finishedSaving = pyqtSignal()
 
     def __init__(self, files: list[ImageFile]):
         super(SaveWidget, self).__init__()
@@ -120,17 +120,10 @@ class SaveWidget(QWidget):
     def set_separate_cover(self, separate_cover: bool):
         self.separate_cover = separate_cover
 
-    @pyqtSlot(PageLayout)
-    def set_pdf_layout(self, layout: PageLayout):
-        if layout == PageLayout.SINGLE_PAGE:
-            self.right_to_left = False
-            self.double_pages = False
-        elif layout == PageLayout.DOUBLE_PAGE_LEFT_RIGHT:
-            self.right_to_left = False
-            self.double_pages = True
-        elif layout == PageLayout.DOUBLE_PAGE_RIGHT_LEFT:
-            self.right_to_left = True
-            self.double_pages = True
+    @pyqtSlot(bool, bool)
+    def set_pdf_layout(self, double_pages: bool, right_to_left: bool):
+        self.double_pages = double_pages
+        self.right_to_left = right_to_left
 
     @pyqtSlot()
     def hide_progress(self):
@@ -149,7 +142,7 @@ class SaveWidget(QWidget):
             if filename:
                 self.activate_progress_view()
 
-                self.started.emit()
+                self.startedSaving.emit()
                 saving = SavingRunnable(self.files, filename, self.separate_cover, self.right_to_left, self.double_pages)
                 saving.signal.progress.connect(self.progress)
                 saving.signal.finished.connect(lambda: self.progress(len(self.files)))
@@ -169,7 +162,7 @@ class SaveWidget(QWidget):
         self.progress_bar.setValue(value)
         if value == self.progress_bar.maximum():
             self.progress_lbl.setText('Saving Completed!')
-            self.finished.emit()
+            self.finishedSaving.emit()
 
     def activate_progress_view(self):
         self.progress_bar.setHidden(False)

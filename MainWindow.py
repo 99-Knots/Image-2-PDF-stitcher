@@ -44,8 +44,8 @@ class MainWindow(QMainWindow):
         self.load_menu.loadedFiles.connect(lambda: self.preview.go_to_index())
 
         self.sort_menu.selectionChanged.connect(lambda: self.preview.go_to_index())
-        self.save_widget.started.connect(lambda: self.toggle_menu_enabled(False))
-        self.save_widget.finished.connect(lambda: self.toggle_menu_enabled(True))
+        self.save_widget.startedSaving.connect(lambda: self.toggle_menu_enabled(False))
+        self.save_widget.finishedSaving.connect(lambda: self.toggle_menu_enabled(True))
 
         self.crop_menu.marginsChanged.connect(self.set_crop_margins)
         self.crop_menu.marginsChanged.connect(self.preview.update_preview)

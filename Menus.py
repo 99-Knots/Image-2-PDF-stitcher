@@ -4,14 +4,14 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import QDir, QFileInfo, QSize, Qt, pyqtSignal, pyqtSlot
 
 
-from structures import SortKeys, PageLayout, ImageFile
+from structures import SortKeys, ImageFile
 
 
 class LayoutMenu(QWidget):
     """
     Menu for the selection of the PDF files page layout
     """
-    selectionChanged = pyqtSignal(PageLayout)   # emits new Layout
+    selectionChanged = pyqtSignal(bool, bool)   # emits new Layout in format: double_pages, right_to_left
     coverChecked = pyqtSignal(bool)     # emits state of separate cover checkbox
 
     def __init__(self):
@@ -19,9 +19,10 @@ class LayoutMenu(QWidget):
         lbl = QLabel('PDF layout: ')
 
         # define the image-layout pairs for the selection buttons
-        attributes = [('images/singlePageIcon.png', PageLayout.SINGLE_PAGE),
-                      ('images/doublePageIcon1.png', PageLayout.DOUBLE_PAGE_LEFT_RIGHT),
-                      ('images/doublePageIcon2.png', PageLayout.DOUBLE_PAGE_RIGHT_LEFT)]
+        # layout: use_double_pages, right_to_left_direction
+        attributes = [('images/singlePageIcon.png', False, False),
+                      ('images/doublePageIcon1.png', True, False),
+                      ('images/doublePageIcon2.png', True, True)]
         self.buttons = list()
         self.selected_index = 0
 
@@ -43,7 +44,7 @@ class LayoutMenu(QWidget):
             btn.setIconSize(QSize(32, 32))
             btn.setCheckable(True)
             btn.clicked.connect(lambda x, index=i: self.select_index(index))
-            btn.clicked.connect(lambda x, a=attr[1]: self.selectionChanged.emit(a))
+            btn.clicked.connect(lambda x, dp=attr[1], rl=attr[2]: self.selectionChanged.emit(dp, rl))
             btn_layout.addWidget(btn)
             self.buttons.append(btn)
 
