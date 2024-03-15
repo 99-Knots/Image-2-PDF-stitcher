@@ -11,12 +11,6 @@ class SortKeys(Enum):
     NAME = 'name'
 
 
-class PageLayout(Enum):
-    SINGLE_PAGE = 'single page'
-    DOUBLE_PAGE_LEFT_RIGHT = 'double page — left to right'
-    DOUBLE_PAGE_RIGHT_LEFT = 'double page — right to left'
-
-
 class ImageFile:
     def __init__(self, file_info: QFileInfo):
         self.name = file_info.fileName()

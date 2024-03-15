@@ -1,54 +1,62 @@
-from PyQt6.QtWidgets import (QWidget, QDoubleSpinBox, QLabel, QPushButton, QCheckBox, QComboBox, QProgressBar,
+from PyQt6.QtWidgets import (QWidget, QDoubleSpinBox, QLabel, QPushButton, QCheckBox, QComboBox,
                              QGridLayout, QHBoxLayout, QVBoxLayout, QSizePolicy, QFileDialog)
 from PyQt6.QtGui import QIcon
-from PyQt6.QtCore import QDir, QFileInfo, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QDir, QFileInfo, QSize, Qt, pyqtSignal, pyqtSlot
 
 
-from structures import SortKeys, PageLayout, ImageFile
-
-
-class IconAttribute:
-    def __init__(self, icon_path, attribute):
-        self.icon = QIcon(icon_path)
-        self.attribute = attribute
+from structures import SortKeys, ImageFile
 
 
 class LayoutMenu(QWidget):
-    selectionChanged = pyqtSignal(PageLayout)
-    coverChecked = pyqtSignal(bool)
+    """
+    Menu for the selection of the PDF files page layout
+    """
+    selectionChanged = pyqtSignal(bool, bool)   # emits new Layout in format: double_pages, right_to_left
+    coverChecked = pyqtSignal(bool)     # emits state of separate cover checkbox
 
     def __init__(self):
         super(LayoutMenu, self).__init__()
         lbl = QLabel('PDF layout: ')
-        attributes = [IconAttribute('images/singlePageIcon.png', PageLayout.SINGLE_PAGE),
-                      IconAttribute('images/doublePageIcon1.png', PageLayout.DOUBLE_PAGE_LEFT_RIGHT),
-                      IconAttribute('images/doublePageIcon2.png', PageLayout.DOUBLE_PAGE_RIGHT_LEFT)]
+
+        # define the image-layout pairs for the selection buttons
+        # layout: use_double_pages, right_to_left_direction
+        attributes = [('images/singlePageIcon.png', False, False),
+                      ('images/doublePageIcon1.png', True, False),
+                      ('images/doublePageIcon2.png', True, True)]
         self.buttons = list()
         self.selected_index = 0
 
         cover_checkbox = QCheckBox('first image as separate cover')
         cover_checkbox.stateChanged.connect(lambda b: self.coverChecked.emit(b))
-        layout = QVBoxLayout(self)
+
         btn_layout = QHBoxLayout()
         btn_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        layout = QVBoxLayout(self)
         layout.addWidget(lbl)
         layout.addLayout(btn_layout)
         layout.addWidget(cover_checkbox)
 
+        # create corresponding icon buttons for all attributes
         for i, attr in enumerate(attributes):
             btn = QPushButton()
-            btn.setIcon(attr.icon)
+            btn.setIcon(QIcon(attr[0]))
             btn.setIconSize(QSize(32, 32))
             btn.setCheckable(True)
             btn.clicked.connect(lambda x, index=i: self.select_index(index))
-            btn.clicked.connect(lambda x, a=attr.attribute: self.selectionChanged.emit(a))
+            btn.clicked.connect(lambda x, dp=attr[1], rl=attr[2]: self.selectionChanged.emit(dp, rl))
             btn_layout.addWidget(btn)
             self.buttons.append(btn)
 
         if self.buttons:
-            self.buttons[0].click()
+            self.buttons[0].click()     # ensure first button is selected and all necessary signals are send
 
-    def select_index(self, index=0):
+    def select_index(self, index):
+        """
+        uncheck the last selected button and check the new one
+        :param index: index of button to be checked
+        :return:
+        """
         if self.buttons:
             self.buttons[self.selected_index].setChecked(False)
             self.selected_index = index
@@ -56,7 +64,10 @@ class LayoutMenu(QWidget):
 
 
 class LoadMenu(QWidget):
-    loadedFiles = pyqtSignal(list)
+    """
+    Menu for loading the images from files
+    """
+    loadedFiles = pyqtSignal(list)  # emits ImageFile list of new loaded files
 
     def __init__(self):
         super(LoadMenu, self).__init__()
@@ -70,7 +81,12 @@ class LoadMenu(QWidget):
         layout.addWidget(load_dir_btn)
         layout.addWidget(load_files_btn)
 
+    @pyqtSlot()
     def load_by_dir(self):
+        """
+        get a directory and load all image files (jpg, png, bmp) from it in ImageFile format
+        :return:
+        """
         selected_path = QFileDialog.getExistingDirectory(self, 'Select Folder')
         if selected_path:
             files = list()
@@ -80,7 +96,12 @@ class LoadMenu(QWidget):
                 files.append(ImageFile(file))
             self.loadedFiles.emit(files)
 
+    @pyqtSlot()
     def load_by_files(self):
+        """
+        get a selection of image files through a QFileDialog and load them as ImageFile format
+        :return:
+        """
         filenames = QFileDialog.getOpenFileNames(self, 'Select individual Files', '', 'Image Files (*.png *.jpg *.bmp)')
         if filenames[0]:
             files = list()
@@ -89,48 +110,11 @@ class LoadMenu(QWidget):
             self.loadedFiles.emit(files)
 
 
-class SaveMenu(QWidget):
-    startSaving = pyqtSignal()
-
-    def __init__(self, files: list[ImageFile]):
-        super(SaveMenu, self).__init__()
-        self.save_btn = QPushButton('create PDF')
-        self.progress_bar = QProgressBar()
-        self.progress_lbl = QLabel('Saving...')
-        self.progress_bar.setHidden(True)
-        self.progress_lbl.setHidden(True)
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.save_btn)
-        layout.addWidget(self.progress_bar)
-        layout.addWidget(self.progress_lbl)
-        self.save_btn.clicked.connect(self.save_pdf)
-
-    def hide_progress(self):
-        self.progress_bar.setHidden(True)
-        self.progress_lbl.setHidden(True)
-
-    def save_pdf(self):
-        self.progress_bar.setHidden(False)
-        self.progress_lbl.setHidden(False)
-        self.progress_bar.setValue(0)
-        self.progress_lbl.setText('Saving...')
-        self.startSaving.emit()
-
-    def set_progress_max(self, new_max: int):
-        self.progress_bar.setMaximum(new_max)
-
-    def progress(self, value: int):
-        self.progress_bar.setValue(value)
-        if value == self.progress_bar.maximum():
-            self.progress_lbl.setText('Saving Completed!')
-
-    def setEnabled(self, a0: bool) -> None:
-        self.save_btn.setEnabled(a0)
-
-
 class SortMenu(QWidget):
-    selectionChanged = pyqtSignal(SortKeys)
+    """
+    Menu for setting the order of loaded files for PDF creation
+    """
+    selectionChanged = pyqtSignal(SortKeys)     # emits new SortKey
 
     def __init__(self, files):
         super(SortMenu, self).__init__()
@@ -149,6 +133,7 @@ class SortMenu(QWidget):
 
         self.sort_key = SortKeys(selection.itemText(0))     # set sort key to default of selection
 
+    @pyqtSlot(SortKeys)
     def sort_files(self, key: SortKeys = None):
         if key is not None:
             self.sort_key = key
@@ -162,6 +147,10 @@ class SortMenu(QWidget):
 
 
 class CropMenu(QWidget):
+    """
+    Menu for setting the individual margins for cropping an image
+    """
+    # emits left, top, right, bottom margin and whether they should be applied to all files
     marginsChanged = pyqtSignal(int, int, int, int, bool)
 
     def __init__(self):
@@ -230,13 +219,19 @@ class CropMenu(QWidget):
         layout.addWidget(bottom_lbl, 5, 0)
         layout.addWidget(self.bottom_edt, 5, 1)
 
-    def __toggle_same_for_all(self, new_value):
+    @pyqtSlot(int)
+    def __toggle_same_for_all(self, new_value: int):    # int because a QPushButtons state is given as int
         self.same_crop_for_all = new_value
         self.marginsChanged.emit(self.left_margin, self.top_margin,
                                  self.right_margin, self.bottom_margin,
                                  self.same_crop_for_all)
 
+    @pyqtSlot()
     def __set_crop_margins(self):
+        """
+        read the LineEdit values and format them before emitting a signal with the new values
+        :return:
+        """
         left = int(self.left_edt.value())
         right = int(self.right_edt.value())
         top = int(self.top_edt.value())
@@ -251,7 +246,14 @@ class CropMenu(QWidget):
                                  self.right_margin, self.bottom_margin,
                                  self.same_crop_for_all)
 
-    def set_limits(self, width, height):
+    @pyqtSlot(int, int)
+    def set_limits(self, width: int, height: int):
+        """
+        set new maximum limits for the edit fields and reset current inputs
+        :param width: new maximum width
+        :param height: new maximum height
+        :return:
+        """
         self.left_edt.setMaximum(width)
         self.left_edt.setValue(0)
         self.right_edt.setMaximum(width)
@@ -262,13 +264,13 @@ class CropMenu(QWidget):
         self.bottom_edt.setMaximum(height)
         self.bottom_edt.setValue(height)
 
-    def set_edt_text(self, left, top, right, bottom):
-        self.left_edt.setValue(left)
-        self.top_edt.setValue(top)
-        self.right_edt.setValue(right)
-        self.bottom_edt.setValue(bottom)
-
+    @pyqtSlot(ImageFile)
     def load_margins(self, image: ImageFile):
+        """
+        load the margins saved in a selected ImageFile into the LineEdits;
+        :param image: ImageFile
+        :return:
+        """
         self.left_edt.setValue(image.left_margin)
         self.right_edt.setValue(image.right_margin)
         self.top_edt.setValue(image.top_margin)
