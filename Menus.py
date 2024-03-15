@@ -11,8 +11,8 @@ class LayoutMenu(QWidget):
     """
     Menu for the selection of the PDF files page layout
     """
-    selectionChanged = pyqtSignal(PageLayout)
-    coverChecked = pyqtSignal(bool)
+    selectionChanged = pyqtSignal(PageLayout)   # emits new Layout
+    coverChecked = pyqtSignal(bool)     # emits state of separate cover checkbox
 
     def __init__(self):
         super(LayoutMenu, self).__init__()
@@ -66,7 +66,7 @@ class LoadMenu(QWidget):
     """
     Menu for loading the images from files
     """
-    loadedFiles = pyqtSignal(list)
+    loadedFiles = pyqtSignal(list)  # emits ImageFile list of new loaded files
 
     def __init__(self):
         super(LoadMenu, self).__init__()
@@ -113,7 +113,7 @@ class SortMenu(QWidget):
     """
     Menu for setting the order of loaded files for PDF creation
     """
-    selectionChanged = pyqtSignal(SortKeys)
+    selectionChanged = pyqtSignal(SortKeys)     # emits new SortKey
 
     def __init__(self, files):
         super(SortMenu, self).__init__()
@@ -149,6 +149,7 @@ class CropMenu(QWidget):
     """
     Menu for setting the individual margins for cropping an image
     """
+    # emits left, top, right, bottom margin and whether they should be applied to all files
     marginsChanged = pyqtSignal(int, int, int, int, bool)
 
     def __init__(self):

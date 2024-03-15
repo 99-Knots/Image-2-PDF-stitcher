@@ -1,12 +1,15 @@
 from PyQt6.QtWidgets import QWidget, QLabel, QLineEdit, QPushButton, QHBoxLayout, QVBoxLayout, QSizePolicy
 from PyQt6.QtGui import QImage, QPixmap, QPainter, QIntValidator
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 
 from structures import ImageFile
 
 
 class PageCounter(QWidget):
-    pageChanged = pyqtSignal(int)
+    """
+    Widget for displaying the current image index out of the total and for switching to a specific image index
+    """
+    pageChanged = pyqtSignal(int)   # emits index of new previewed file
 
     def __init__(self):
         super(PageCounter, self).__init__()
@@ -30,30 +33,47 @@ class PageCounter(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.resize_labels()
 
+    @pyqtSlot(str)
     def emit_page_change(self, text: str):
+        """
+        slot that takes a LineEdits text and then formats it to a valid index before emitting the
+        pageChanged signal with the new index
+        :param text: LineEdit text
+        :return:
+        """
         if text:
             i = max(self.validator.bottom(), min(self.validator.top(), int(text)))
             self.pageChanged.emit(i-1)
         else:
             self.pageChanged.emit(0)
 
-    def resize_labels(self):
-        max_txt = '0' * (len(str(self.validator.top())) + 2)    # size widgets to fit page count plus some
-        width = self.current_edt.fontMetrics().horizontalAdvance(max_txt)
-        self.current_edt.setFixedWidth(width)
-        self.page_nr_lbl.setFixedWidth(width)
-
+    @pyqtSlot(int)
     def set_page_count(self, nr: int):
         self.page_nr_lbl.setText(str(nr))
         self.validator.setTop(nr)
         self.resize_labels()
 
+    @pyqtSlot(int)
     def go_to_page(self, i: int):
         if i != 0 and self.current_edt.text() != '':
             self.current_edt.setText(str(i))
 
+    def resize_labels(self):
+        """
+        adjust the width of the current index LineEdit and the total number Label to always fit the
+        maximum number and ensure they are centered horizontally
+        :return:
+        """
+        max_txt = '0' * (len(str(self.validator.top())) + 2)    # size widgets to fit page count plus some
+        width = self.current_edt.fontMetrics().horizontalAdvance(max_txt)
+        self.current_edt.setFixedWidth(width)
+        self.page_nr_lbl.setFixedWidth(width)
+
 
 class PreviewLabel(QLabel):
+    """
+    Label for displaying a preview of the cropped file
+    """
     def __init__(self, file: ImageFile = None):
         super(PreviewLabel, self).__init__()
         self.file = file
@@ -76,6 +96,11 @@ class PreviewLabel(QLabel):
             self.setPixmap(pixmap)
 
     def draw_crop(self):
+        """
+        draw the area outside the crop margins as grayed out and add some lines to emphasize where
+        exactly those margins lie
+        :return:
+        """
         h = self.file.height
         w = self.file.width
 
@@ -96,14 +121,18 @@ class PreviewLabel(QLabel):
 
         self.update_pixmap()
 
+    @pyqtSlot(ImageFile)
     def set_image(self, file: ImageFile):
         self.file = file
         self.draw_crop()
 
 
 class ImagePreview(QWidget):
-    previewChanged = pyqtSignal(ImageFile, int)
-    pageCountChanged = pyqtSignal(int)
+    """
+    Widget that holds the Preview Label as well as the interface to change the currently previewed file
+    """
+    previewChanged = pyqtSignal(ImageFile, int)     # emits new file being previewed and its index in the file list
+    pageCountChanged = pyqtSignal(int)      # emits new total number of loaded image files
 
     def __init__(self, files: list[ImageFile]):
         super(ImagePreview, self).__init__()
@@ -158,14 +187,13 @@ class ImagePreview(QWidget):
             self._page_count = i
             self.pageCountChanged.emit(self.page_count)
 
-    def go_to_index(self, index=0):
+    @pyqtSlot(int)
+    def go_to_index(self, index: int = 0):
         if self.files:
             self.page_count = len(self.files)   # set here to ensure it's always up-to-date
             self.index = index % self.page_count
 
+    @pyqtSlot()
     def update_preview(self):
         if self.files:
             self.previewChanged.emit(self.files[self.index], self.index)
-
-    def set_preview_lbl_height(self, h):
-        self.preview_lbl.setMinimumHeight(h)
