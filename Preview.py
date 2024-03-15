@@ -38,7 +38,7 @@ class PageCounter(QWidget):
             self.pageChanged.emit(0)
 
     def resize_labels(self):
-        max_txt = '0' * (len(str(self.validator.top())) + 2)
+        max_txt = '0' * (len(str(self.validator.top())) + 2)    # size widgets to fit page count plus some
         width = self.current_edt.fontMetrics().horizontalAdvance(max_txt)
         self.current_edt.setFixedWidth(width)
         self.page_nr_lbl.setFixedWidth(width)
@@ -53,6 +53,54 @@ class PageCounter(QWidget):
             self.current_edt.setText(str(i))
 
 
+class PreviewLabel(QLabel):
+    def __init__(self, file: ImageFile = None):
+        super(PreviewLabel, self).__init__()
+        self.file = file
+        self.img = QImage()
+        self.setStyleSheet('background-color: rgb(192, 192, 192)')
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setMinimumSize(375, 500)
+
+    def resizeEvent(self, a0) -> None:
+        super(PreviewLabel, self).resizeEvent(a0)
+        self.update_pixmap()
+
+    def update_pixmap(self):
+        pixmap = QPixmap.fromImage(self.img)
+        if not pixmap.isNull():
+            pixmap = pixmap.scaled(self.size(),
+                                   Qt.AspectRatioMode.KeepAspectRatio,
+                                   Qt.TransformationMode.SmoothTransformation)
+            self.setPixmap(pixmap)
+
+    def draw_crop(self):
+        h = self.file.height
+        w = self.file.width
+
+        grayscale = self.file.pil_image().convert('L')
+        grayscale = grayscale.point(lambda p: p * 0.5)  # darken grayscale
+        cropped_img = self.file.crop()
+        img = grayscale.convert('RGB')
+        img.paste(cropped_img, (self.file.left_margin, self.file.top_margin))
+        self.img = QImage(img.tobytes('raw', 'RGB'), w, h, QImage.Format.Format_RGB888)
+
+        painter = QPainter(self.img)
+        painter.setPen(Qt.GlobalColor.cyan)
+        painter.drawLine(self.file.left_margin, 0, self.file.left_margin, h)
+        painter.drawLine(self.file.right_margin, 0, self.file.right_margin, h)
+        painter.drawLine(0, self.file.top_margin, w, self.file.top_margin)
+        painter.drawLine(0, self.file.bottom_margin, w, self.file.bottom_margin)
+        painter.end()
+
+        self.update_pixmap()
+
+    def set_image(self, file: ImageFile):
+        self.file = file
+        self.draw_crop()
+
+
 class ImagePreview(QWidget):
     previewChanged = pyqtSignal(ImageFile, int)
     pageCountChanged = pyqtSignal(int)
@@ -63,21 +111,23 @@ class ImagePreview(QWidget):
         self._index = 0
         self._page_count = 0
 
-        self.preview_img = None
-        self.preview_lbl = QLabel()
-        self.preview_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_lbl.setStyleSheet('background-color: rgb(192, 192, 192)')
-        self.preview_lbl.setFixedSize(375, 500)
+        self.preview_img = QImage()
+        self.preview_lbl = PreviewLabel()
 
         self.page_counter = PageCounter()
         self.previewChanged.connect(lambda x, i: self.page_counter.go_to_page(i+1))
+        self.previewChanged.connect(self.preview_lbl.set_image)
         self.pageCountChanged.connect(self.page_counter.set_page_count)
         self.page_counter.pageChanged.connect(self.go_to_index)
 
         next_btn = QPushButton('>')
         next_btn.clicked.connect(lambda: self.go_to_index(self.index + 1))
+        # next_btn.setMaximumWidth(next_btn.fontMetrics().averageCharWidth()*5)
+        # next_btn.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
         prev_btn = QPushButton('<')
         prev_btn.clicked.connect(lambda: self.go_to_index(self.index - 1))
+        # prev_btn.setMaximumWidth(next_btn.fontMetrics().averageCharWidth()*5)
+        # prev_btn.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
 
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
@@ -94,10 +144,9 @@ class ImagePreview(QWidget):
 
     @index.setter   # setters allow for signals to be emitted on changes to variable -> link with labels
     def index(self, index):
-        self._index = index
-        if self.files:
+        if index != self._index:
+            self._index = index
             self.update_preview()
-            self.previewChanged.emit(self.files[self.index], self.index)
 
     @property
     def page_count(self):
@@ -108,47 +157,15 @@ class ImagePreview(QWidget):
         if i != self.page_count:
             self._page_count = i
             self.pageCountChanged.emit(self.page_count)
-            #self.page_counter.set_page_count(self.page_count)
-
-    def assign_files(self, file_list: list[ImageFile]):
-        self.files = file_list  # reference to file list
-        self.page_count = len(self.files)
-        self.go_to_index()
 
     def go_to_index(self, index=0):
         if self.files:
-            self.page_count = len(self.files)   # set here to ensure it's always up to date
-            self.index = (self.page_count + index) % self.page_count
-
-    def draw_crop_preview(self):
-        file = self.files[self.index]
-        h = file.height
-        w = file.width
-
-        grayscale = file.pil_image().convert('L')
-        grayscale = grayscale.point(lambda p: p*0.5)    # darken grayscale
-        cropped_img = file.crop()
-        img = grayscale.convert('RGBA')
-        img.paste(cropped_img, (file.left_margin, file.top_margin))
-        q_img = QImage(img.tobytes('raw', 'RGBA'), w, h, QImage.Format.Format_RGBA8888)
-
-        # todo: since this is only for display, do these conversions on the pixmap or a scaled version?
-
-        painter = QPainter(q_img)
-        painter.setPen(Qt.GlobalColor.cyan)
-        painter.drawLine(file.left_margin, 0, file.left_margin, h)
-        painter.drawLine(file.right_margin, 0, file.right_margin, h)
-        painter.drawLine(0, file.top_margin, w, file.top_margin)
-        painter.drawLine(0, file.bottom_margin, w, file.bottom_margin)
-        painter.end()
-
-        pixmap = QPixmap.fromImage(q_img)
-        pixmap = pixmap.scaled(self.preview_lbl.size(),
-                               Qt.AspectRatioMode.KeepAspectRatio,
-                               Qt.TransformationMode.SmoothTransformation)
-        self.preview_lbl.setPixmap(pixmap)
+            self.page_count = len(self.files)   # set here to ensure it's always up-to-date
+            self.index = index % self.page_count
 
     def update_preview(self):
         if self.files:
-            self.preview_img = self.files[self.index]
-            self.draw_crop_preview()
+            self.previewChanged.emit(self.files[self.index], self.index)
+
+    def set_preview_lbl_height(self, h):
+        self.preview_lbl.setMinimumHeight(h)

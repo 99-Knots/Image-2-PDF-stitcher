@@ -43,7 +43,7 @@ class MainWindow(QMainWindow):
                                                                              self.max_image_height - 1))
         self.load_menu.loadedFiles.connect(lambda: self.preview.go_to_index())
 
-        self.sort_menu.selectionChanged.connect(self.preview.update_preview)
+        self.sort_menu.selectionChanged.connect(lambda: self.preview.go_to_index())
         self.save_widget.started.connect(lambda: self.toggle_menu_enabled(False))
         self.save_widget.finished.connect(lambda: self.toggle_menu_enabled(True))
 
@@ -70,6 +70,8 @@ class MainWindow(QMainWindow):
         option_layout.addWidget(self.save_widget)
 
         main_layout.addLayout(option_layout)
+        main_layout.setStretch(0, 1)
+        main_layout.setStretch(1, 0)
         self.setCentralWidget(center_widget)
 
     @pyqtSlot(bool)
@@ -79,7 +81,7 @@ class MainWindow(QMainWindow):
         :param enabled: whether menus should be enabled or not
         :return:
         """
-        self.preview.setEnabled(enabled)
+        #self.preview.setEnabled(enabled)
         self.load_menu.setEnabled(enabled)
         self.sort_menu.setEnabled(enabled)
         self.layout_menu.setEnabled(enabled)
