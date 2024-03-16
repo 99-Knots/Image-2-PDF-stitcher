@@ -13,7 +13,7 @@ class SortKeys(Enum):
 
 class ImageFile:
     def __init__(self, file_info: QFileInfo):
-        self.name = file_info.fileName()
+        self.name = file_info.baseName()
         self.suffix = file_info.suffix().lower()
         self.create_timestamp = file_info.birthTime()
         self.absolute_path = file_info.absoluteFilePath()

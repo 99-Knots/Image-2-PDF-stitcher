@@ -101,25 +101,26 @@ class PreviewLabel(QLabel):
         exactly those margins lie
         :return:
         """
-        h = self.file.height
-        w = self.file.width
+        if self.file:
+            h = self.file.height
+            w = self.file.width
 
-        grayscale = self.file.pil_image().convert('L')
-        grayscale = grayscale.point(lambda p: p * 0.5)  # darken grayscale
-        cropped_img = self.file.crop()
-        img = grayscale.convert('RGB')
-        img.paste(cropped_img, (self.file.left_margin, self.file.top_margin))
-        self.img = QImage(img.tobytes('raw', 'RGB'), w, h, QImage.Format.Format_RGB888)
+            grayscale = self.file.pil_image().convert('L')
+            grayscale = grayscale.point(lambda p: p * 0.5)  # darken grayscale
+            cropped_img = self.file.crop()
+            img = grayscale.convert('RGB')
+            img.paste(cropped_img, (self.file.left_margin, self.file.top_margin))
+            self.img = QImage(img.tobytes('raw', 'RGB'), w, h, QImage.Format.Format_RGB888)
 
-        painter = QPainter(self.img)
-        painter.setPen(Qt.GlobalColor.cyan)
-        painter.drawLine(self.file.left_margin, 0, self.file.left_margin, h)
-        painter.drawLine(self.file.right_margin, 0, self.file.right_margin, h)
-        painter.drawLine(0, self.file.top_margin, w, self.file.top_margin)
-        painter.drawLine(0, self.file.bottom_margin, w, self.file.bottom_margin)
-        painter.end()
+            painter = QPainter(self.img)
+            painter.setPen(Qt.GlobalColor.cyan)
+            painter.drawLine(self.file.left_margin, 0, self.file.left_margin, h)
+            painter.drawLine(self.file.right_margin, 0, self.file.right_margin, h)
+            painter.drawLine(0, self.file.top_margin, w, self.file.top_margin)
+            painter.drawLine(0, self.file.bottom_margin, w, self.file.bottom_margin)
+            painter.end()
 
-        self.update_pixmap()
+            self.update_pixmap()
 
     @pyqtSlot(ImageFile)
     def set_image(self, file: ImageFile):
