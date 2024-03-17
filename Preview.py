@@ -133,6 +133,7 @@ class ImagePreview(QWidget):
     Widget that holds the Preview Label as well as the interface to change the currently previewed file
     """
     previewChanged = pyqtSignal(ImageFile, int)     # emits new file being previewed and its index in the file list
+    redrawPreview = pyqtSignal()
     pageCountChanged = pyqtSignal(int)      # emits new total number of loaded image files
 
     def __init__(self, files: list[ImageFile]):
@@ -147,6 +148,7 @@ class ImagePreview(QWidget):
         self.page_counter = PageCounter()
         self.previewChanged.connect(lambda x, i: self.page_counter.go_to_page(i+1))
         self.previewChanged.connect(self.preview_lbl.set_image)
+        self.redrawPreview.connect(self.preview_lbl.draw_crop)
         self.pageCountChanged.connect(self.page_counter.set_page_count)
         self.page_counter.pageChanged.connect(self.go_to_index)
 
@@ -176,6 +178,7 @@ class ImagePreview(QWidget):
     def index(self, index):
         self._index = index
         self.update_preview()
+        self.previewChanged.emit(self.files[self.index], self.index)
 
     @property
     def page_count(self):
@@ -196,4 +199,4 @@ class ImagePreview(QWidget):
     @pyqtSlot()
     def update_preview(self):
         if self.files:
-            self.previewChanged.emit(self.files[self.index], self.index)
+            self.redrawPreview.emit()

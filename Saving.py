@@ -115,15 +115,16 @@ class SavingRunnable(QRunnable):
 
 
 class SaveDialog(QDialog):
+    # emits path, if grayscale, if optimize, compression level, resolution and resize factor
     confirmedOptions = pyqtSignal(str, bool, bool, int, int, float)
 
     def __init__(self, default_path: str, parent=None):
         super(SaveDialog, self).__init__(parent)
-        self.save_path = default_path + '/imagesTo.pdf'
         self.setWindowTitle('Save Options')
 
+        self.save_path = default_path + '/imagesTo.pdf'
         self.to_grayscale = False
-        self.optimize = True
+        self.optimize = False
         self.compression_level = 6
         self.resolution = 300
         self.img_scale = 1.0
@@ -144,7 +145,7 @@ class SaveDialog(QDialog):
         optimize_check.setChecked(self.optimize)
 
         compression_slider = CustomSlider(0, 10, self.compression_level)
-        compression_slider.set_extrema_label_text('no \ncompression', 'max \ncompression')
+        compression_slider.set_extrema_label_text('no\ncompression', 'max\ncompression')
         compression_slider.valueChanged.connect(self.set_compression)
 
         resolution_edt = CustomIntEdit(self.resolution, 'dpi')
@@ -282,9 +283,8 @@ class CustomIntEdit(QWidget):
 
     def __init__(self, default: int, unit: str):
         super(CustomIntEdit, self).__init__()
-        validator = QIntValidator(0, 999)
         edt = QLineEdit(str(default))
-        edt.setValidator(validator)
+        edt.setValidator(QIntValidator(0, 999))
         edt.setFixedWidth(edt.fontMetrics().horizontalAdvance('0')*8)
         edt.setAlignment(Qt.AlignmentFlag.AlignRight)
         unit_lbl = QLabel(unit)
@@ -322,10 +322,9 @@ class SaveWidget(QWidget):
         layout.addWidget(self.save_btn)
         layout.addWidget(self.progress_bar)
         layout.addWidget(self.progress_lbl)
-        #self.save_btn.clicked.connect(self.save_pdf)
-        self.save_btn.clicked.connect(self.test)
+        self.save_btn.clicked.connect(self.open_save_dialog)
 
-    def test(self):
+    def open_save_dialog(self):
         if self.files:
             dialog = SaveDialog(os.path.dirname(self.files[0].absolute_path))
             dialog.confirmedOptions.connect(self.save_pdf)
