@@ -1,6 +1,7 @@
-from PyQt6.QtWidgets import (QWidget, QLabel, QPushButton, QLineEdit, QCheckBox,
-                             QProgressBar, QVBoxLayout, QGridLayout,
+from PyQt6.QtWidgets import (QWidget, QLabel, QPushButton, QLineEdit, QCheckBox, QSlider, QSpacerItem,
+                             QProgressBar, QVBoxLayout, QHBoxLayout, QGridLayout,
                              QFileDialog, QDialog, QSizePolicy)
+from PyQt6.QtGui import QIntValidator
 from PyQt6.QtCore import Qt, QObject, QRunnable, QThreadPool, pyqtSignal, pyqtSlot
 
 from PIL import Image
@@ -17,7 +18,7 @@ class SavingRunnable(QRunnable):
         finished = pyqtSignal()
         progress = pyqtSignal(int)
 
-    def __init__(self, files, filename, separate_cover, right_to_left, double_pages, to_grayscale=False, optimize=False):
+    def __init__(self, files, filename, separate_cover, right_to_left, double_pages, to_grayscale=False, optimize=False, compress_lvl=0, res=300, img_scale=1.0):
         super(SavingRunnable, self).__init__()
         self.page_list = list()
         self.files = files
@@ -27,8 +28,9 @@ class SavingRunnable(QRunnable):
         self.double_pages = double_pages
         self.to_grayscale = to_grayscale
         self.optimize = optimize
-        self.compression_level = 6
-        self.resolution = 300
+        self.compression_level = compress_lvl
+        self.resolution = res
+        self.img_scale = img_scale
         self.signal = SavingRunnable.SavingSignal()
 
     @staticmethod
@@ -61,6 +63,7 @@ class SavingRunnable(QRunnable):
         if self.files:
             for i, f in enumerate(self.files):
                 img = f.crop()
+                img = img.resize((int(img.width*self.img_scale), int(img.height*self.img_scale)))
                 if self.to_grayscale:
                     img = img.convert('L')
                     page = Image.new('L', (img.width, img.height))
@@ -73,7 +76,6 @@ class SavingRunnable(QRunnable):
 
     def create_double_page_list(self):
         page_list = list()
-        mode = 'RGB'
         if self.files:
             start_index = 0
             if self.separate_cover:
@@ -81,11 +83,12 @@ class SavingRunnable(QRunnable):
                 page_list.append(self.files[0].crop())
             for i in range(start_index, len(self.files), 2):
                 img1 = self.files[i].crop()
+                img1 = img1.resize((img1.width*self.img_scale, img1.height*self.img_scale))
                 if self.to_grayscale:
-                    mode = 'L'
                     img1.convert('L')
                 if i + 1 < len(self.files):
                     img2 = self.files[i + 1].crop()
+                    img2 = img2.resize((img2.width*self.img_scale, img2.height*self.img_scale))
                     if self.to_grayscale:
                         img2.convert('L')
                     if self.right_to_left:
@@ -106,22 +109,24 @@ class SavingRunnable(QRunnable):
             page_list = self.create_double_page_list()
         else:
             page_list = self.create_single_page_list()
-        page_list[0].save(self.filename, 'PDF', optimize=self.optimize,
-                          save_all=True, append_images=(p for p in page_list[1:]))
+        page_list[0].save(self.filename, 'PDF', optimize=self.optimize, dpi=(self.resolution, self.resolution),
+                          compress_level=self.compression_level, save_all=True, append_images=(p for p in page_list[1:]))
         self.signal.finished.emit()
 
 
 class SaveDialog(QDialog):
-    def __init__(self, files: list[ImageFile], parent=None):
+    confirmedOptions = pyqtSignal(str, bool, bool, int, int, float)
+
+    def __init__(self, default_path: str, parent=None):
         super(SaveDialog, self).__init__(parent)
-        self.files = files
-        self.save_path = os.path.dirname(self.files[0].absolute_path) + '/imagesTo.pdf'
+        self.save_path = default_path + '/imagesTo.pdf'
         self.setWindowTitle('Save Options')
 
         self.to_grayscale = False
         self.optimize = True
         self.compression_level = 6
         self.resolution = 300
+        self.img_scale = 1.0
 
         self.warning_lbl = QLabel()
         self.warning_lbl.setStyleSheet('font-style: italic;')
@@ -132,23 +137,45 @@ class SaveDialog(QDialog):
 
         bw_check = QCheckBox('convert to grayscale')
         bw_check.stateChanged.connect(self.set_grayscale)
+        bw_check.setChecked(self.to_grayscale)
+
         optimize_check = QCheckBox('optimize for file size')
         optimize_check.stateChanged.connect(self.set_optimize)
-        save_btn = QPushButton('save')
+        optimize_check.setChecked(self.optimize)
 
-        # set compression, resolution
+        compression_slider = CustomSlider(0, 10, self.compression_level)
+        compression_slider.set_extrema_label_text('no \ncompression', 'max \ncompression')
+        compression_slider.valueChanged.connect(self.set_compression)
+
+        resolution_edt = CustomIntEdit(self.resolution, 'dpi')
+        resolution_edt.valueChanged.connect(self.set_resolution)
+
+        scale_edt = CustomIntEdit(int(self.img_scale*100), '%')
+        scale_edt.valueChanged.connect(self.set_img_scale)
+
+        save_btn = QPushButton('save')
+        save_btn.clicked.connect(self.on_save_press)
 
         browse_btn = QPushButton('Browse...')
         browse_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         browse_btn.clicked.connect(self.select_file)
 
         layout = QGridLayout(self)
-        layout.addWidget(self.path_edt, 0, 0, 1, 2)
-        layout.addWidget(browse_btn, 0, 2, 1, 1)
-        layout.addWidget(self.warning_lbl, 1, 0, 1, -1)
-        layout.addWidget(bw_check, 2, 0)
-        layout.addWidget(optimize_check, 2, 1)
-        layout.addWidget(save_btn, 4, 0, 1, -1)
+        layout.addWidget(QLabel('path: '), 0, 0)
+        layout.addWidget(self.path_edt, 0, 1, 1, 2)
+        layout.addWidget(browse_btn, 0, 3)
+        layout.addWidget(self.warning_lbl, 1, 1, 1, -1)
+        layout.addWidget(bw_check, 2, 0, 1, -1)
+        layout.addWidget(optimize_check, 3, 0)
+        layout.addWidget(QLabel('compression level: '), 4, 0)
+        layout.addWidget(compression_slider, 4, 1)
+        layout.addWidget(QLabel('resolution: '), 5, 0)
+        layout.addWidget(resolution_edt, 5, 1)
+        layout.addWidget(QLabel('image scale: '), 6, 0)
+        layout.addWidget(scale_edt, 6, 1)
+
+        layout.addItem(QSpacerItem(15, 15), 7, 0)
+        layout.addWidget(save_btn, 8, 0, 1, -1)
 
     def set_save_path(self, path):
         suffix = os.path.splitext(path)[1]
@@ -173,6 +200,102 @@ class SaveDialog(QDialog):
     @pyqtSlot(int)
     def set_optimize(self, optimize: int):
         self.optimize = bool(optimize)
+
+    @pyqtSlot(int)
+    def set_compression(self, value: int):
+        self.compression_level = value
+
+    @pyqtSlot(int)
+    def set_resolution(self, value: int):
+        self.resolution = value
+
+    @pyqtSlot(int)
+    def set_img_scale(self, value: int):
+        self.img_scale = value/100
+
+    @pyqtSlot()
+    def on_save_press(self):
+        self.confirmedOptions.emit(self.save_path,
+                                   self.to_grayscale,
+                                   self.optimize,
+                                   self.compression_level,
+                                   self.resolution,
+                                   self.img_scale)
+        self.close()
+
+
+class CustomSlider(QWidget):
+    valueChanged = pyqtSignal(int)
+
+    def __init__(self, minimum: int, maximum: int, default: int, step_size: int = 1):
+        super(CustomSlider, self).__init__()
+        validator = QIntValidator(minimum, maximum)
+
+        self.slider = QSlider(Qt.Orientation.Horizontal)
+        self.slider.setMinimum(minimum)
+        self.slider.setMaximum(maximum)
+        self.slider.setValue(default)
+        self.slider.setSingleStep(step_size)
+        self.slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+
+        edt = QLineEdit(str(default))
+        edt.setValidator(validator)
+        edt.setFixedWidth(edt.fontMetrics().horizontalAdvance('0') * (len(str(validator.top()))+2))
+        edt.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self.min_lbl = QLabel('')
+        self.min_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.max_lbl = QLabel('')
+        self.max_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        default_font_size = self.min_lbl.font().pointSize()
+        self.min_lbl.setStyleSheet(f'font-size: {default_font_size*0.7}pt;')
+        self.max_lbl.setStyleSheet(f'font-size: {default_font_size*0.7}pt;')
+
+        edt.textEdited.connect(self.set_value)
+        self.slider.valueChanged.connect(lambda v: edt.setText(str(v)))
+        self.slider.valueChanged.connect(self.valueChanged.emit)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(edt)
+        layout.addWidget(self.min_lbl)
+        layout.addWidget(self.slider)
+        layout.addWidget(self.max_lbl)
+
+    def set_extrema_label_text(self, min_txt: str = None, max_txt: str = None):
+        if min_txt is not None:
+            self.min_lbl.setText(min_txt)
+        if max_txt is not None:
+            self.max_lbl.setText(max_txt)
+
+    @pyqtSlot(str)
+    def set_value(self, text: str):
+        if text:
+            value = max(self.slider.minimum(), min(int(text), self.slider.maximum()))
+            self.slider.setValue(value)
+        else:
+            self.slider.setValue(self.slider.minimum())
+
+
+class CustomIntEdit(QWidget):
+    valueChanged = pyqtSignal(int)
+
+    def __init__(self, default: int, unit: str):
+        super(CustomIntEdit, self).__init__()
+        validator = QIntValidator(0, 999)
+        edt = QLineEdit(str(default))
+        edt.setValidator(validator)
+        edt.setFixedWidth(edt.fontMetrics().horizontalAdvance('0')*8)
+        edt.setAlignment(Qt.AlignmentFlag.AlignRight)
+        unit_lbl = QLabel(unit)
+        unit_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(edt)
+        layout.addWidget(unit_lbl)
+
+        edt.textChanged.connect(lambda t: self.valueChanged.emit(int(t)))
 
 
 class SaveWidget(QWidget):
@@ -204,7 +327,8 @@ class SaveWidget(QWidget):
 
     def test(self):
         if self.files:
-            dialog = SaveDialog(self.files)
+            dialog = SaveDialog(os.path.dirname(self.files[0].absolute_path))
+            dialog.confirmedOptions.connect(self.save_pdf)
             dialog.exec()
 
     @pyqtSlot(bool)
@@ -222,21 +346,20 @@ class SaveWidget(QWidget):
             self.progress_bar.setHidden(True)
             self.progress_lbl.setHidden(True)
 
-    @pyqtSlot()
-    def save_pdf(self):
+    @pyqtSlot(str, bool, bool, int, int, float)
+    def save_pdf(self, filename, to_gray, optimize, compress_lvl, res, img_scale):
         """
         get save location through QFileDialog and start Saving process
         :return:
         """
         if self.files:
-            filename = QFileDialog.getSaveFileName(self, 'Save File', '', 'PDF Files  (*.pdf)')[0]
-            if filename:
-                self.activate_progress_view()
-                saving = SavingRunnable(self.files, filename, self.separate_cover, self.right_to_left, self.double_pages)
-                saving.signal.progress.connect(self.progress)
-                saving.signal.finished.connect(lambda: self.progress(len(self.files)))
-                QThreadPool.globalInstance().start(saving)
-                self.startedSaving.emit()
+            self.activate_progress_view()
+            saving = SavingRunnable(self.files, filename, self.separate_cover, self.right_to_left, self.double_pages,
+                                    to_gray, optimize, compress_lvl, res, img_scale)
+            saving.signal.progress.connect(self.progress)
+            saving.signal.finished.connect(lambda: self.progress(len(self.files)))
+            QThreadPool.globalInstance().start(saving)
+            self.startedSaving.emit()
 
     @pyqtSlot(int)
     def set_progress_max(self, new_max: int):
