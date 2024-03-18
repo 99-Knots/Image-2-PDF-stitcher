@@ -166,14 +166,18 @@ class SaveDialog(QDialog):
         layout.addWidget(self.path_edt, 0, 1, 1, 2)
         layout.addWidget(browse_btn, 0, 3)
         layout.addWidget(self.warning_lbl, 1, 1, 1, -1)
-        layout.addWidget(bw_check, 2, 0, 1, -1)
-        layout.addWidget(optimize_check, 3, 0)
-        layout.addWidget(QLabel('compression level: '), 4, 0)
-        layout.addWidget(compression_slider, 4, 1)
-        layout.addWidget(QLabel('resolution: '), 5, 0)
-        layout.addWidget(resolution_edt, 5, 1)
-        layout.addWidget(QLabel('image scale: '), 6, 0)
-        layout.addWidget(scale_edt, 6, 1)
+
+        layout.addWidget(QLabel('compression level: '), 2, 0)
+        layout.addWidget(compression_slider, 2, 1)
+
+        layout.addWidget(QLabel('resolution: '), 3, 0)
+        layout.addWidget(resolution_edt, 3, 1)
+
+        layout.addWidget(QLabel('image scale: '), 4, 0)
+        layout.addWidget(scale_edt, 4, 1)
+
+        layout.addWidget(bw_check, 5, 1, 1, -1)
+        layout.addWidget(optimize_check, 6, 1, 1, -1)
 
         layout.addItem(QSpacerItem(15, 15), 7, 0)
         layout.addWidget(save_btn, 8, 0, 1, -1)
