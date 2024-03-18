@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import (QWidget, QDoubleSpinBox, QLabel, QPushButton, QCheckBox, QComboBox,
+from PyQt6.QtWidgets import (QWidget, QSpinBox, QLabel, QPushButton, QCheckBox, QComboBox,
                              QGridLayout, QHBoxLayout, QVBoxLayout, QSizePolicy, QFileDialog)
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import QDir, QFileInfo, QSize, Qt, pyqtSignal, pyqtSlot
@@ -157,36 +157,32 @@ class CropMenu(QWidget):
         super(CropMenu, self).__init__()
         # create the Edit Fields for input and initialize their values and functionalities
         self.left_margin = 0
-        self.left_edt = QDoubleSpinBox()
+        self.left_edt = QSpinBox()
         self.left_edt.setRange(0, 0)
-        self.left_edt.setDecimals(0)
         self.left_edt.setWrapping(True)
         self.left_edt.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.left_edt.valueChanged.connect(self.__set_crop_margins)
 
         self.right_margin = 0
-        self.right_edt = QDoubleSpinBox()
+        self.right_edt = QSpinBox()
         self.right_edt.setRange(0, 0)
-        self.right_edt.setDecimals(0)
         self.right_edt.setWrapping(True)
         self.right_edt.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.right_edt.valueChanged.connect(self.__set_crop_margins)
 
         self.top_margin = 0
-        self.top_edt = QDoubleSpinBox()
+        self.top_edt = QSpinBox()
         self.top_edt.setRange(0, 0)
-        self.top_edt.setDecimals(0)
         self.top_edt.setWrapping(True)
         self.top_edt.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.top_edt.valueChanged.connect(self.__set_crop_margins)
 
         self.bottom_margin = 0
-        self.bottom_edt = QDoubleSpinBox()
+        self.bottom_edt = QSpinBox()
         self.bottom_edt.setRange(0, 0)
-        self.bottom_edt.setDecimals(0)
         self.bottom_edt.setWrapping(True)
         self.bottom_edt.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.bottom_edt.textChanged.connect(self.__set_crop_margins)
+        self.bottom_edt.valueChanged.connect(self.__set_crop_margins)
 
         self.same_crop_for_all = True   # whether the margin values should be applied to all or only the current image
         self.__setup_layout()
@@ -271,7 +267,16 @@ class CropMenu(QWidget):
         :param image: ImageFile
         :return:
         """
+        # ensure all values can be assigned before set_margins is triggered
+        self.left_edt.blockSignals(True)
+        self.right_edt.blockSignals(True)
+        self.top_edt.blockSignals(True)
+
         self.left_edt.setValue(image.left_margin)
         self.right_edt.setValue(image.right_margin)
         self.top_edt.setValue(image.top_margin)
         self.bottom_edt.setValue(image.bottom_margin)
+
+        self.left_edt.blockSignals(False)
+        self.right_edt.blockSignals(False)
+        self.top_edt.blockSignals(False)

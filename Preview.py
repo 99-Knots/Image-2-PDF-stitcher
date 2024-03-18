@@ -101,25 +101,26 @@ class PreviewLabel(QLabel):
         exactly those margins lie
         :return:
         """
-        h = self.file.height
-        w = self.file.width
+        if self.file:
+            h = self.file.height
+            w = self.file.width
 
-        grayscale = self.file.pil_image().convert('L')
-        grayscale = grayscale.point(lambda p: p * 0.5)  # darken grayscale
-        cropped_img = self.file.crop()
-        img = grayscale.convert('RGB')
-        img.paste(cropped_img, (self.file.left_margin, self.file.top_margin))
-        self.img = QImage(img.tobytes('raw', 'RGB'), w, h, QImage.Format.Format_RGB888)
+            grayscale = self.file.pil_image().convert('L')
+            grayscale = grayscale.point(lambda p: p * 0.5)  # darken grayscale
+            cropped_img = self.file.crop()
+            img = grayscale.convert('RGB')
+            img.paste(cropped_img, (self.file.left_margin, self.file.top_margin))
+            self.img = QImage(img.tobytes('raw', 'RGB'), w, h, QImage.Format.Format_RGB888)
 
-        painter = QPainter(self.img)
-        painter.setPen(Qt.GlobalColor.cyan)
-        painter.drawLine(self.file.left_margin, 0, self.file.left_margin, h)
-        painter.drawLine(self.file.right_margin, 0, self.file.right_margin, h)
-        painter.drawLine(0, self.file.top_margin, w, self.file.top_margin)
-        painter.drawLine(0, self.file.bottom_margin, w, self.file.bottom_margin)
-        painter.end()
+            painter = QPainter(self.img)
+            painter.setPen(Qt.GlobalColor.cyan)
+            painter.drawLine(self.file.left_margin, 0, self.file.left_margin, h)
+            painter.drawLine(self.file.right_margin, 0, self.file.right_margin, h)
+            painter.drawLine(0, self.file.top_margin, w, self.file.top_margin)
+            painter.drawLine(0, self.file.bottom_margin, w, self.file.bottom_margin)
+            painter.end()
 
-        self.update_pixmap()
+            self.update_pixmap()
 
     @pyqtSlot(ImageFile)
     def set_image(self, file: ImageFile):
@@ -132,6 +133,7 @@ class ImagePreview(QWidget):
     Widget that holds the Preview Label as well as the interface to change the currently previewed file
     """
     previewChanged = pyqtSignal(ImageFile, int)     # emits new file being previewed and its index in the file list
+    redrawPreview = pyqtSignal()
     pageCountChanged = pyqtSignal(int)      # emits new total number of loaded image files
 
     def __init__(self, files: list[ImageFile]):
@@ -146,6 +148,7 @@ class ImagePreview(QWidget):
         self.page_counter = PageCounter()
         self.previewChanged.connect(lambda x, i: self.page_counter.go_to_page(i+1))
         self.previewChanged.connect(self.preview_lbl.set_image)
+        self.redrawPreview.connect(self.preview_lbl.draw_crop)
         self.pageCountChanged.connect(self.page_counter.set_page_count)
         self.page_counter.pageChanged.connect(self.go_to_index)
 
@@ -175,6 +178,7 @@ class ImagePreview(QWidget):
     def index(self, index):
         self._index = index
         self.update_preview()
+        self.previewChanged.emit(self.files[self.index], self.index)
 
     @property
     def page_count(self):
@@ -195,4 +199,4 @@ class ImagePreview(QWidget):
     @pyqtSlot()
     def update_preview(self):
         if self.files:
-            self.previewChanged.emit(self.files[self.index], self.index)
+            self.redrawPreview.emit()

@@ -16,7 +16,7 @@ class MainWindow(QMainWindow):
     """
     def __init__(self):
         super(MainWindow, self).__init__()
-        self.setWindowTitle('Images to PDF Stitcher')
+        self.setWindowTitle('PDF-Stitcher')
         self.setWindowIcon(QIcon('images/icon.png'))
 
         # properties
@@ -39,8 +39,8 @@ class MainWindow(QMainWindow):
 
         self.load_menu.loadedFiles.connect(self.load_files)
         self.load_menu.loadedFiles.connect(lambda: self.sort_menu.sort_files())
-        self.load_menu.loadedFiles.connect(lambda: self.crop_menu.set_limits(self.max_image_width - 1,
-                                                                             self.max_image_height - 1))
+        self.load_menu.loadedFiles.connect(lambda: self.crop_menu.set_limits(self.max_image_width,
+                                                                             self.max_image_height))
         self.load_menu.loadedFiles.connect(lambda: self.preview.go_to_index())
 
         self.sort_menu.selectionChanged.connect(lambda: self.preview.go_to_index())
@@ -58,7 +58,6 @@ class MainWindow(QMainWindow):
     def __setup_layout(self):
         center_widget = QWidget(self)
         main_layout = QHBoxLayout(center_widget)
-        main_layout.addWidget(self.preview)
 
         option_layout = QVBoxLayout()
         option_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -69,6 +68,8 @@ class MainWindow(QMainWindow):
         option_layout.addWidget(self.layout_menu)
         option_layout.addWidget(self.save_widget)
 
+        main_layout.addWidget(self.preview)
+        main_layout.addStretch()
         main_layout.addLayout(option_layout)
         main_layout.setStretch(0, 1)
         main_layout.setStretch(1, 0)
@@ -81,7 +82,7 @@ class MainWindow(QMainWindow):
         :param enabled: whether menus should be enabled or not
         :return:
         """
-        #self.preview.setEnabled(enabled)
+        # self.preview.setEnabled(enabled)
         self.load_menu.setEnabled(enabled)
         self.sort_menu.setEnabled(enabled)
         self.layout_menu.setEnabled(enabled)
