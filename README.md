@@ -1,6 +1,6 @@
 # <img alt="makeshift logo showing two image files being stitched together with a needle and thread" src="images/icon.png" align="left" width="128px">Image-to-PDF-stitcher
 
-This small python program allows users to open a selection of saved images and then concat them as pages to create a PDF-file.
+This small Python program offers users a straightforward solution for converting a selection of saved images into a cohesive PDF file, providing an accessible tool for efficient document organization and sharing.
 
 ## Usage 
 Upon launching the application, users can import images for PDF-conversion by clicking one of the `load`-buttons. They have the option to either select a folder containing images or pick individual files.
