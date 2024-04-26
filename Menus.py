@@ -71,6 +71,7 @@ class LoadMenu(QWidget):
 
     def __init__(self):
         super(LoadMenu, self).__init__()
+        self.supported_extensions = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.webp']
         load_dir_btn = QPushButton('load from folder')
         load_files_btn = QPushButton('load from files')
 
@@ -91,7 +92,7 @@ class LoadMenu(QWidget):
         if selected_path:
             files = list()
             directory = QDir(selected_path)
-            file_infos = directory.entryInfoList(['*.jpg', '*.png', '*.bmp'], QDir.Filter.Files)
+            file_infos = directory.entryInfoList(self.supported_extensions, QDir.Filter.Files)
             for file in file_infos:
                 files.append(ImageFile(file))
             self.loadedFiles.emit(files)
@@ -102,7 +103,8 @@ class LoadMenu(QWidget):
         get a selection of image files through a QFileDialog and load them as ImageFile format
         :return:
         """
-        filenames = QFileDialog.getOpenFileNames(self, 'Select individual Files', '', 'Image Files (*.png *.jpg *.bmp)')
+        filenames = QFileDialog.getOpenFileNames(self, 'Select individual Files', '',
+                                                 'Image Files (' + ' '.join(self.supported_extensions) + ')')
         if filenames[0]:
             files = list()
             for file in filenames[0]:
