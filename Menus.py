@@ -138,7 +138,7 @@ class SortMenu(QWidget):
         if key is not None:
             self.sort_key = key
         if self.sort_key == SortKeys.NAME:
-            self.files.sort(key=lambda f: f.name)
+            self.files.sort(key=lambda f: f.name.lower())
         if self.sort_key == SortKeys.CREATE_DATE:
             self.files.sort(key=lambda f: f.create_timestamp)
         if self.sort_key == SortKeys.LAST_MODIFIED:
