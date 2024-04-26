@@ -1,4 +1,4 @@
-# <img alt="makeshift logo showing two image files being stitched together with a needle and thread" src="images/icon.png" align="left" width="128px">Image-to-PDF-stitcher
+# <img alt="makeshift logo showing two image files being stitched together with a needle and thread" src="images/icon.png" align="left" width="128px">Image-2-PDF stitcher
 
 This small Python program offers users a straightforward solution for converting a selection of saved images into a cohesive PDF file, providing an accessible tool for efficient document organization and sharing.
 
