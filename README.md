@@ -3,7 +3,7 @@
 This small Python program offers users a straightforward solution for converting a selection of saved images into a cohesive PDF file, providing an accessible tool for efficient document organization and sharing.
 
 ## Usage 
-<img alt="animated demo gif showing the program running" src="images/Demo.gif" align=right>
+<img alt="animated demo gif showing the program running" src="images/Demo.gif" align=right width="388">
 
 Upon launching the application, users can import images for PDF-conversion by clicking one of the `load`-buttons. They have the option to either select a folder containing images or pick individual files.
 Once the images are loaded into the interface, they will appear in the preview section. Depending on the quantity and size of the images, this process may take a moment.
